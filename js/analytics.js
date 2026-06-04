@@ -45,10 +45,12 @@ window.generateExcel = function() {
     }
 
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Report ID,Waste Type,Status,Assigned WMO,Latitude,Longitude,Date Logged\n";
+    // UPDATED: Set the exact columns you requested
+    csvContent += "Report ID,Waste Type,Assigned WMO,Status\n";
 
     rawExportData.forEach(row => {
-        let rowStr = `"${row.id}","${row.type}","${row.status}","${row.wmo}","${row.lat}","${row.lng}","${row.date}"`;
+        // UPDATED: Placed variables in the exact order requested
+        let rowStr = `"${row.id}","${row.type}","${row.wmo}","${row.status}"`;
         csvContent += rowStr + "\n";
     });
 
@@ -192,7 +194,6 @@ function applyFiltersAndUpdateUI() {
     document.getElementById('statActiveReports').innerText = activeCount;
     document.getElementById('statCompletedReports').innerText = completedCount;
 
-    // FIX: Calculate Completion Rate against ALL filtered reports (Completed / Total)
     let totalReports = filteredReports.length;
     let completionRate = totalReports > 0 ? Math.round((completedCount / totalReports) * 100) : 0;
     document.getElementById('statCompletionRate').innerText = completionRate + "%";
