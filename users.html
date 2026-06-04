@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - EcoTrack+</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <div class="dashboard">
+
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="images/ecotrack-logo.png" alt="EcoTrack Logo" class="sidebar-logo">
+            </div>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item"><a href="index.html" class="nav-link">Dashboard</a></li>
+                    <li class="nav-item"><a href="users.html" class="nav-link active">Manage Users</a></li>
+                    <li class="nav-item"><a href="reports.html" class="nav-link">Waste Reports</a></li>
+                    <li class="nav-item"><a href="centers.html" class="nav-link">Recycling Centers</a></li>
+                    <li class="nav-item"><a href="analytics.html" class="nav-link">Analytics</a></li>
+                    <li class="nav-item"><a href="feedback.html" class="nav-link">Feedback</a></li>
+
+                    <div class="sidebar-footer">
+                        <button class="logout-btn" id="logoutBtn">↩ Logout</button>
+                    </div>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+
+            <div class="header">
+                <h2>User Management</h2>
+                <div class="user-info">
+                    <div class="user-avatar">AD</div>
+                    <div>
+                        <div style="font-weight:600;">Admin User</div>
+                        <div style="font-size:0.813rem;color:var(--text-secondary);" id="adminEmailDisplay">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card">
+
+                <div class="section-header">
+                    <h3>User Management</h3>
+                    <div>
+                        <button class="btn btn-primary" onclick="openModal('userModal')">
+                            Add WMO Account
+                        </button>
+                    </div>
+                </div>
+
+                <div class="section-body">
+
+                    <div class="search-filter-bar">
+                        <div class="search-box">
+                            <input type="text" placeholder="Search users..." id="userSearch">
+                        </div>
+
+                        <div class="user-tabs">
+                            <button class="tab-btn active" onclick="showUserTab('citizen')">Citizens</button>
+                            <button class="tab-btn" onclick="showUserTab('wmo')">WMO Officers</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+
+                        <div id="citizenSection" class="user-section active">
+                            <div class="table-container">
+                                <table id="citizenTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Points</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="citizenTableBody">
+                                        <tr><td colspan="5" style="text-align:center;">Loading citizens...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div id="wmoSection" class="user-section">
+                            <div class="table-container">
+                                <table id="wmoTable">
+                                    <thead>
+                                        <tr>
+                                            <th>USER ID (UID)</th>
+                                            <th>NAME</th>
+                                            <th>EMAIL</th>
+                                            <th>AREA COVERED</th>
+                                            <th title="Total active reports (Pending / In Progress)">ACTIVE ASSIGNMENTS</th>
+                                            <th>STATUS</th>
+                                            <th>ACTIONS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="wmoTableBody">
+                                        <tr><td colspan="7" style="text-align:center;">Loading WMO officers...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create WMO Account</h3>
+                <button class="modal-close" onclick="closeModal('userModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="wmoForm" autocomplete="off">
+                    <div class="form-group">
+                        <label class="form-label">Company Name</label>
+                        <input type="text" id="wmoCompany" class="form-input" placeholder="e.g. ALAM FLORA" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Officer Name</label>
+                            <input type="text" id="wmoName" class="form-input" placeholder="e.g. Ali Bin Abu" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Area Covered (Presint)</label>
+                            <select id="wmoPresint" class="form-select">
+                                <option value="Presint 1, 2, 3">Presint 1, 2, 3</option>
+                                <option value="Presint 4, 5, 6">Presint 4, 5, 6</option>
+                                <option value="Presint 7, 8, 9, 10">Presint 7, 8, 9, 10</option>
+                                <option value="Presint 11, 12, 13">Presint 11, 12, 13</option>
+                                <option value="Presint 14, 15, 16">Presint 14, 15, 16</option>
+                                <option value="Presint 17, 18, 19, 20">Presint 17, 18, 19, 20</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Email</label>
+                            <input type="email" id="wmoEmail" class="form-input" placeholder="e.g. new.officer@wmo.com" autocomplete="off" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Initial Password</label>
+                            <div style="position: relative;">
+                                <input type="password" id="wmoPassword" class="form-input" placeholder="Enter a secure password" autocomplete="new-password" style="padding-right: 40px; width: 100%; box-sizing: border-box;" required>
+                                <button type="button" id="togglePasswordBtn" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; padding: 0;" title="Show/Hide Password">👁️</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                <div id="wmoErrorMsg" style="color: red; display: none; text-align: center; margin-top: 10px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
+                <button class="btn btn-primary" id="submitWmoBtn">Create Account</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit User Profile</h3>
+                <button class="modal-close" onclick="closeModal('editUserModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" id="editUserId">
+                    
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" id="editUserName" class="form-input" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" id="editUserEmail" class="form-input" required>
+                    </div>
+
+                    <div id="editWmoFields" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label">Company</label>
+                            <input type="text" id="editUserCompany" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Area Covered (Presint)</label>
+                            <select id="editUserPresint" class="form-select">
+                                <option value="Presint 1, 2, 3">Presint 1, 2, 3</option>
+                                <option value="Presint 4, 5, 6">Presint 4, 5, 6</option>
+                                <option value="Presint 7, 8, 9, 10">Presint 7, 8, 9, 10</option>
+                                <option value="Presint 11, 12, 13">Presint 11, 12, 13</option>
+                                <option value="Presint 14, 15, 16">Presint 14, 15, 16</option>
+                                <option value="Presint 17, 18, 19, 20">Presint 17, 18, 19, 20</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('editUserModal')">Cancel</button>
+                <button class="btn btn-primary" id="saveEditUserBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/common.js"></script>
+    <script type="module" src="js/users.js"></script>
+
+</body>
+</html>

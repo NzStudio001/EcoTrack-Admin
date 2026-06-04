@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waste Reports - EcoTrack+</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <div class="dashboard">
+
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="images/ecotrack-logo.png" alt="EcoTrack Logo" class="sidebar-logo">
+            </div>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item"><a href="index.html" class="nav-link">Dashboard</a></li>
+                    <li class="nav-item"><a href="users.html" class="nav-link">Manage Users</a></li>
+                    <li class="nav-item"><a href="reports.html" class="nav-link active">Waste Reports</a></li>
+                    <li class="nav-item"><a href="centers.html" class="nav-link">Recycling Centers</a></li>
+                    <li class="nav-item"><a href="analytics.html" class="nav-link">Analytics</a></li>
+                    <li class="nav-item"><a href="feedback.html" class="nav-link">Feedback</a></li>
+
+                    <div class="sidebar-footer">
+                        <button class="logout-btn" id="logoutBtn">↩ Logout</button>
+                    </div>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+
+            <div class="header">
+                <h2>Waste Reports</h2>
+                <div class="user-info">
+                    <div class="user-avatar">AD</div>
+                    <div>
+                        <div style="font-weight:600;">Admin User</div>
+                        <div style="font-size:0.813rem;color:var(--text-secondary);" id="adminEmailDisplay">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card">
+
+                <div class="section-header">
+                    <h3>Waste Reports Tracker</h3>
+                </div>
+
+                <div class="section-body">
+
+                    <div class="search-filter-bar">
+                        <div class="search-box">
+                            <input type="text" placeholder="Search reports..." id="reportSearch">
+                        </div>
+
+                        <select class="form-select" id="statusFilter" style="width:auto;">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="in progress">In Progress</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+
+                    <div class="table-container">
+                        <table id="reportsTable">
+                            <thead>
+                                <tr>
+                                    <th>Report ID</th>
+                                    <th>Type</th>
+                                    <th>AI Prediction</th>
+                                    <th>Address</th>
+                                    <th>Assigned WMO</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportsTableBody">
+                                <tr><td colspan="7" style="text-align:center;">Loading waste reports...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="reportModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>Report Details</h3>
+                <button class="modal-close" onclick="closeModal('reportModal')">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div style="text-align: center; margin-bottom: 20px; background: var(--bg-main); border-radius: 8px; padding: 10px;">
+                    <img id="modalImage" src="" alt="Report Evidence" style="max-height: 250px; max-width: 100%; border-radius: 8px; display: none;">
+                    <div id="modalNoImage" style="color: var(--text-secondary); padding: 20px;">No image provided</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Report ID</label>
+                        <input type="text" class="form-input" id="modalReportId" readonly style="background: var(--bg-main);">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Time Logged</label>
+                        <input type="text" class="form-input" id="modalTime" readonly style="background: var(--bg-main);">
+                    </div>
+                </div>
+
+                <h4 style="margin-bottom: 15px; color: var(--primary-dark); font-size: 1rem;">Report Data</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Waste Type</label>
+                        <input type="text" class="form-input" id="modalType" readonly style="background: var(--bg-main);">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Condition</label>
+                        <input type="text" class="form-input" id="modalCondition" readonly style="background: var(--bg-main);">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Size</label>
+                        <input type="text" class="form-input" id="modalSize" readonly style="background: var(--bg-main);">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Location / Address</label>
+                    <input type="text" class="form-input" id="modalAddress" readonly style="background: var(--bg-main);">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Citizen Description</label>
+                    <textarea class="form-textarea" id="modalUserDesc" readonly style="background: var(--bg-main); min-height: 60px;"></textarea>
+                </div>
+
+                <hr style="margin: 25px 0; border: none; border-top: 1px solid var(--border);">
+                
+                <h4 style="margin-bottom: 15px; color: var(--primary-dark); font-size: 1rem;">AI Analysis & Management Actions</h4>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Override AI Severity Analysis</label>
+                        <select class="form-select" id="modalPrediction" style="border-color: var(--primary); font-weight: bold; color: var(--primary-dark);">
+                            <option value="Low_Severity">Low Severity</option>
+                            <option value="Medium_Severity">Medium Severity</option>
+                            <option value="High_Severity">High Severity</option>
+                            <option value="No_Waste">No Waste / Rejected</option>
+                            <option value="Unanalyzed">Unanalyzed / Unknown</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">AI Confidence Score</label>
+                        <input type="text" class="form-input" id="modalConfidence" readonly style="background: var(--bg-main);">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">AI Explanation</label>
+                    <textarea class="form-textarea" id="modalAiDesc" readonly style="background: var(--bg-main); min-height: 60px;"></textarea>
+                </div>
+
+                <div class="form-row" style="margin-top: 20px;">
+                    <div class="form-group">
+                        <label class="form-label">Assign WMO Officer</label>
+                        <div style="display: flex; gap: 10px;">
+                            <select class="form-select" id="modalWmoSelect" style="flex: 1;">
+                                <option value="">-- Unassigned --</option>
+                            </select>
+                            <button class="btn btn-secondary" id="autoAssignBtn" type="button" title="Auto-assign based on Presint location">Auto-Assign</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Update Status</label>
+                        <select class="form-select" id="modalStatusSelect">
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Resolved">Resolved</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- UPDATED MODAL FOOTER WITH DELETE BUTTON -->
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button class="btn btn-secondary" id="deleteReportBtn" style="background-color: #f87171; color: white; border: none;">Delete Report</button>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" onclick="closeModal('reportModal')">Cancel</button>
+                    <button class="btn btn-primary" id="updateReportBtn">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/common.js"></script>
+    <script type="module" src="js/reports.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard - EcoTrack+</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+
+<body>
+
+    <div class="dashboard">
+
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="images/ecotrack-logo.png" alt="EcoTrack Logo" class="sidebar-logo">
+            </div>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item"><a href="index.html" class="nav-link">Dashboard</a></li>
+                    <li class="nav-item"><a href="users.html" class="nav-link">Manage Users</a></li>
+                    <li class="nav-item"><a href="reports.html" class="nav-link">Waste Reports</a></li>
+                    <li class="nav-item"><a href="centers.html" class="nav-link">Recycling Centers</a></li>
+                    <li class="nav-item"><a href="analytics.html" class="nav-link active">Analytics</a></li>
+                    <li class="nav-item"><a href="feedback.html" class="nav-link">Feedback</a></li>
+
+                    <div class="sidebar-footer">
+                        <button class="logout-btn" id="logoutBtn">↩ Logout</button>
+                    </div>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content" id="printableDashboard">
+
+            <div class="header">
+                <h2>Analytics Dashboard</h2>
+                <div class="user-info">
+                    <div class="user-avatar">AD</div>
+                    <div>
+                        <div style="font-weight:600;">Admin User</div>
+                        <div style="font-size:0.813rem;color:var(--text-secondary);" id="adminEmailDisplay">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cards-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="statTotalReports">--</div>
+                            <div class="stat-label">Total Reports</div>
+                        </div>
+                        <div class="stat-icon green">📊</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="statActiveReports">--</div>
+                            <div class="stat-label">Active Reports</div>
+                        </div>
+                        <div class="stat-icon orange">📋</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="statCompletedReports">--</div>
+                            <div class="stat-label">Completed Reports</div>
+                        </div>
+                        <div class="stat-icon green">✅</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div>
+                            <div class="stat-value" id="statCompletionRate">--%</div>
+                            <div class="stat-label">Completion Rate</div>
+                        </div>
+                        <div class="stat-icon yellow">📈</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card" id="exportToolsCard">
+                <div class="section-header">
+                    <h3>Analytics Tools</h3>
+                    <div>
+                        <button class="btn btn-secondary" onclick="window.generatePDF()" id="pdfBtn">Export PDF</button>
+                        <button class="btn btn-secondary" onclick="window.generateExcel()" id="excelBtn">Export Excel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card" style="margin-bottom: 24px; padding: 16px 24px;">
+                <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+                    
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="timeFilter" style="font-weight: 600; color: var(--text-primary);">Filter:</label>
+                        <select id="timeFilter" class="form-select" style="min-width: 150px;">
+                            <option value="all">All Time</option>
+                            <option value="1day">Last 24 Hours</option>
+                            <option value="1week">Last 7 Days</option>
+                            <option value="1month">Last 1 Month</option>
+                            <option value="1year">Last 1 Year</option>
+                        </select>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="presintFilter" style="font-weight: 600; color: var(--text-primary);">Presint:</label>
+                        <select id="presintFilter" class="form-select" style="min-width: 150px;">
+                            <option value="all">All Presints</option>
+                            <option value="8">Presint 8</option>
+                            <option value="9">Presint 9</option>
+                            <option value="11">Presint 11</option>
+                            <option value="14">Presint 14</option>
+                            <option value="15">Presint 15</option>
+                        </select>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3>Reports Over Time</h3>
+                    </div>
+                    <div class="section-body">
+                        <div class="chart-container">
+                            <canvas id="reportsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3>Status Distribution</h3>
+                    </div>
+                    <div class="section-body">
+                        <div class="chart-container">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Waste Reports Heatmap</h3>
+                </div>
+                <div class="section-body">
+                    <div id="map" style="height: 400px; border-radius: 12px; z-index: 1;"></div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script type="module" src="js/common.js"></script>
+    <script type="module" src="js/analytics.js"></script>
+
+</body>
+</html>
