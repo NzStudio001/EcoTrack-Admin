@@ -56,18 +56,26 @@
 
                 <div class="section-body">
 
-                    <div class="search-filter-bar">
+                    <!-- UPDATED FILTER BAR WITH DATE PICKER -->
+                    <div class="search-filter-bar" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
                         <div class="search-box">
                             <input type="text" placeholder="Search reports..." id="reportSearch">
                         </div>
 
-                        <select class="form-select" id="statusFilter" style="width:auto;">
-                            <option value="">All Statuses</option>
-                            <option value="pending">Pending</option>
-                            <option value="in progress">In Progress</option>
-                            <option value="resolved">Resolved</option>
-                            <option value="rejected">Rejected</option>
-                        </select>
+                        <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <label for="dateFilter" style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Date:</label>
+                                <input type="date" class="form-input" id="dateFilter" style="width:auto; padding: 8px; border-radius: 8px; border: 1px solid var(--border); color: var(--text-primary);">
+                            </div>
+
+                            <select class="form-select" id="statusFilter" style="width:auto;">
+                                <option value="">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="in progress">In Progress</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="table-container">
@@ -80,11 +88,13 @@
                                     <th>Address</th>
                                     <th>Assigned WMO</th>
                                     <th>Status</th>
+                                    <th>Date</th> <!-- Added Date Column -->
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="reportsTableBody">
-                                <tr><td colspan="7" style="text-align:center;">Loading waste reports...</td></tr>
+                                <!-- Updated colspan to 8 to account for new Date column -->
+                                <tr><td colspan="8" style="text-align:center;">Loading waste reports...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -94,6 +104,7 @@
         </main>
     </div>
 
+    <!-- REPORT DETAILS MODAL -->
     <div id="reportModal" class="modal">
         <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header">
@@ -194,7 +205,6 @@
 
             </div>
 
-            <!-- UPDATED MODAL FOOTER WITH DELETE BUTTON -->
             <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
                 <button class="btn btn-secondary" id="deleteReportBtn" style="background-color: #f87171; color: white; border: none;">Delete Report</button>
                 <div style="display: flex; gap: 10px;">
