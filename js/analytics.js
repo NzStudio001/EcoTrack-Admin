@@ -10,7 +10,8 @@ let mapInstance = null;
 let markersArray = [];
 
 let allRawReports = []; // Stores all data from Firebase
-let rawExportData = []; // Stores filtered data for Excel/CSV Export
+let rawExportData = []; // Stores filtered raw data for Excel/CSV Export
+let rawExportWmoStats = {}; // NEW: Stores the WMO summary stats for Excel/CSV Export
 
 // ==========================================
 // 1. EXPORT FUNCTIONS
@@ -45,11 +46,22 @@ window.generateExcel = function() {
     }
 
     let csvContent = "data:text/csv;charset=utf-8,";
-    // UPDATED: Set the exact columns you requested
+    
+    // --- NEW: SECTION 1 - WMO SUMMARY ---
+    csvContent += "--- WMO PERFORMANCE SUMMARY ---\n";
+    csvContent += "WMO Name,Pending,In Progress,Completed,Total Assigned Reports\n";
+    
+    for (const [wmoName, stats] of Object.entries(rawExportWmoStats)) {
+        csvContent += `"${wmoName}",${stats.pending},${stats.inProgress},${stats.completed},${stats.total}\n`;
+    }
+
+    csvContent += "\n\n"; // Add space between tables
+
+    // --- SECTION 2 - RAW REPORT DATA ---
+    csvContent += "--- DETAILED REPORT DATA ---\n";
     csvContent += "Report ID,Waste Type,Assigned WMO,Status\n";
 
     rawExportData.forEach(row => {
-        // UPDATED: Placed variables in the exact order requested
         let rowStr = `"${row.id}","${row.type}","${row.wmo}","${row.status}"`;
         csvContent += rowStr + "\n";
     });
@@ -57,7 +69,7 @@ window.generateExcel = function() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "EcoTrack_Report_Data.csv"); 
+    link.setAttribute("download", "EcoTrack_Analytics_Export.csv"); 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -134,21 +146,11 @@ function applyFiltersAndUpdateUI() {
     let dateCounts = {}; 
     let mapPoints = [];
     
-    rawExportData = []; // Clear old export data to only export filtered items
+    rawExportData = []; // Clear old export data
+    rawExportWmoStats = {}; // NEW: Clear old WMO stats
 
     filteredReports.forEach(report => {
         
-        // Export Prep
-        let rawDate = "N/A";
-        if (report.timestamp) {
-            const d = report.timestamp.toDate ? report.timestamp.toDate() : new Date(report.timestamp);
-            rawDate = d.toLocaleString();
-            
-            // Chart Prep
-            const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            dateCounts[dateStr] = (dateCounts[dateStr] || 0) + 1;
-        }
-
         let status = (report.status || 'Pending').toLowerCase();
         let displayStatus = 'Pending';
 
@@ -168,14 +170,32 @@ function applyFiltersAndUpdateUI() {
             activeCount++;
         }
 
+        let wmoName = report.assigned_wmo_name || 'Unassigned';
+
+        // --- NEW: Calculate WMO Stats for Export ---
+        if (!rawExportWmoStats[wmoName]) {
+            rawExportWmoStats[wmoName] = { pending: 0, inProgress: 0, completed: 0, total: 0 };
+        }
+        rawExportWmoStats[wmoName].total++;
+        if (displayStatus === 'Pending') rawExportWmoStats[wmoName].pending++;
+        if (displayStatus === 'In Progress') rawExportWmoStats[wmoName].inProgress++;
+        if (displayStatus === 'Resolved') rawExportWmoStats[wmoName].completed++;
+
+
+        // Format Date for charts
+        if (report.timestamp) {
+            const d = report.timestamp.toDate ? report.timestamp.toDate() : new Date(report.timestamp);
+            const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            dateCounts[dateStr] = (dateCounts[dateStr] || 0) + 1;
+        }
+
         rawExportData.push({
             id: report.report_id || report.id,
             type: report.type || 'Unknown',
             status: displayStatus,
-            wmo: report.assigned_wmo_name || 'Unassigned',
+            wmo: wmoName,
             lat: report.latitude || 'N/A',
-            lng: report.longitude || 'N/A',
-            date: rawDate
+            lng: report.longitude || 'N/A'
         });
 
         // Map Prep
