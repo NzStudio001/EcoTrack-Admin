@@ -1,7 +1,6 @@
 // js/reports.js
 
 import { db } from './firebase-init.js';
-// Added deleteDoc to the imports
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
 
 let allReports = {}; 
@@ -36,17 +35,18 @@ function loadReports() {
     onSnapshot(collection(db, 'reports'), (snapshot) => {
         const tableBody = document.getElementById('reportsTableBody');
         tableBody.innerHTML = '';
-        allReports = {}; // Reset local cache
+        allReports = {}; 
 
         if (snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No reports found.</td></tr>';
+            // Updated to colspan="8"
+            tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No reports found.</td></tr>';
             return;
         }
 
         snapshot.forEach((docSnap) => {
             const data = docSnap.data();
             const id = docSnap.id;
-            allReports[id] = data; // Cache data for the modal
+            allReports[id] = data; 
 
             const shortId = data.report_id ? data.report_id.substring(0,8) + '...' : id.substring(0,6) + '...';
             const type = data.type || 'Unknown';
@@ -54,7 +54,21 @@ function loadReports() {
             const address = data.address ? data.address.substring(0, 30) + '...' : 'Coordinates provided';
             const wmoName = data.assigned_wmo_name || '<span style="color: var(--warning);">Unassigned</span>';
             
-            // Status Badge Formatting defaults to "Resolved"
+            // Format dates for display AND filtering
+            let displayDate = 'N/A';
+            let isoDate = ''; // This will hold the "YYYY-MM-DD" format for the filter matching
+            
+            if (data.timestamp) {
+                const dateObj = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+                // Human readable display date
+                displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                
+                // Adjust for local timezone to match HTML date picker
+                const offset = dateObj.getTimezoneOffset() * 60000;
+                const localISOTime = (new Date(dateObj - offset)).toISOString().slice(0, -1);
+                isoDate = localISOTime.split('T')[0];
+            }
+
             let statusText = data.status || 'Pending';
             let statusClass = 'pending';
             if (statusText.toLowerCase() === 'resolved' || statusText.toLowerCase() === 'done' || statusText.toLowerCase() === 'completed') {
@@ -64,8 +78,9 @@ function loadReports() {
             if (statusText.toLowerCase() === 'in progress') statusClass = 'in-progress';
             if (statusText.toLowerCase() === 'rejected') statusClass = 'rejected';
 
+            // Include data-date attribute directly in the row tag
             const row = `
-                <tr>
+                <tr data-date="${isoDate}">
                     <td style="font-weight: bold; color: var(--text-secondary);" title="${data.report_id || id}">${shortId}</td>
                     <td style="font-weight: 500;">${type}</td>
                     <td style="font-weight: 500;">${prediction.replace('_', ' ')}</td>
@@ -77,6 +92,7 @@ function loadReports() {
                             ${statusText}
                         </span>
                     </td>
+                    <td><span style="font-size: 0.85rem; color: var(--text-secondary);">${displayDate}</span></td>
                     <td>
                         <button class="btn btn-secondary btn-sm" onclick="window.openReportModal('${id}')">Review / Assign</button>
                     </td>
@@ -84,6 +100,9 @@ function loadReports() {
             `;
             tableBody.innerHTML += row;
         });
+        
+        // Re-apply filter automatically whenever data refreshes
+        filterTable();
     });
 }
 
@@ -144,7 +163,6 @@ window.openReportModal = function(id) {
     let optionExists = Array.from(predictionSelect.options).some(opt => opt.value === safePrediction);
     predictionSelect.value = optionExists ? safePrediction : 'Unanalyzed';
 
-    // Ensure status formats cleanly to "Resolved" in dropdown
     let rawStatus = data.status || 'Pending';
     if(rawStatus.toLowerCase() === 'done' || rawStatus.toLowerCase() === 'completed') rawStatus = 'Resolved';
     document.getElementById('modalStatusSelect').value = rawStatus;
@@ -165,12 +183,11 @@ document.getElementById('autoAssignBtn').addEventListener('click', () => {
     const reportData = allReports[currentEditingReportId];
     const reportAddress = (reportData.address || '').toLowerCase();
 
-    // Look for "Presint X" in the report's address
     let detectedPresintNum = null;
     const presintMatch = reportAddress.match(/presint\s*(\d+)/);
     
     if (presintMatch && presintMatch[1]) {
-        detectedPresintNum = presintMatch[1]; // Extracts just the number (e.g. "8")
+        detectedPresintNum = presintMatch[1]; 
     }
 
     if (!detectedPresintNum) {
@@ -178,10 +195,8 @@ document.getElementById('autoAssignBtn').addEventListener('click', () => {
         return;
     }
 
-    // Find WMOs whose assigned coverage array includes this exact Presint number
     const matchingWMOs = wmoList.filter(wmo => {
         const wmoCoverage = (wmo.presint || '').toLowerCase();
-        // Use regex to find the exact number (prevents Presint 1 from matching Presint 10)
         const regex = new RegExp(`\\b${detectedPresintNum}\\b`);
         return regex.test(wmoCoverage);
     });
@@ -191,7 +206,6 @@ document.getElementById('autoAssignBtn').addEventListener('click', () => {
         return;
     }
 
-    // If multiple WMOs cover the same area, pick the one with the lowest workload
     const sortedWMOs = matchingWMOs.sort((a, b) => {
         return (a['Assigned Reports'] || 0) - (b['Assigned Reports'] || 0);
     });
@@ -252,7 +266,6 @@ if (deleteReportBtn) {
     deleteReportBtn.addEventListener('click', async () => {
         if (!currentEditingReportId) return;
 
-        // Display a confirmation dialog before proceeding
         const confirmDelete = window.confirm("Are you sure you want to delete this waste report? This action cannot be undone.");
         
         if (confirmDelete) {
@@ -261,10 +274,7 @@ if (deleteReportBtn) {
             deleteReportBtn.disabled = true;
 
             try {
-                // Delete the document directly from Firestore
                 await deleteDoc(doc(db, 'reports', currentEditingReportId));
-                
-                // Close the modal; the onSnapshot listener will automatically remove the row from the table
                 window.closeModal('reportModal');
             } catch (error) {
                 console.error("Error deleting report:", error);
@@ -284,18 +294,25 @@ if (deleteReportBtn) {
 function filterTable() {
     let searchValue = document.getElementById("reportSearch").value.toLowerCase();
     let statusFilter = document.getElementById("statusFilter").value.toLowerCase();
+    let dateFilter = document.getElementById("dateFilter").value; // Format: "YYYY-MM-DD"
     let rows = document.querySelectorAll("#reportsTableBody tr");
 
     rows.forEach(row => {
-        if (row.innerText.includes("Loading")) return;
+        if (row.innerText.includes("Loading") || row.innerText.includes("No reports")) return;
         
         let rowText = row.textContent.toLowerCase();
         let matchesSearch = rowText.includes(searchValue);
         let matchesStatus = statusFilter === "" || rowText.includes(statusFilter);
+        
+        // Date Logic Check
+        let rowDate = row.getAttribute("data-date") || "";
+        let matchesDate = dateFilter === "" || rowDate === dateFilter;
 
-        row.style.display = (matchesSearch && matchesStatus) ? "" : "none";
+        row.style.display = (matchesSearch && matchesStatus && matchesDate) ? "" : "none";
     });
 }
 
+// Attach all event listeners
 document.getElementById("reportSearch").addEventListener("keyup", filterTable);
 document.getElementById("statusFilter").addEventListener("change", filterTable);
+document.getElementById("dateFilter").addEventListener("change", filterTable);
