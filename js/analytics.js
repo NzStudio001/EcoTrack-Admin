@@ -128,12 +128,17 @@ function applyFiltersAndUpdateUI() {
             if (timeFilter === '1year' && diffDays > 365) isValidTime = false;
         }
 
-        // 2. Presint Check
+        // 2. Presint Check (Updated to handle grouped values like "1,2,3")
         let isValidPresint = true;
         if (presintFilter !== 'all') {
             const address = (report.address || '').toLowerCase();
-            const regex = new RegExp(`(?:presint|precinct)\\s*0*${presintFilter}\\b`, 'i');
-            if (!regex.test(address)) isValidPresint = false;
+            const presintNumbers = presintFilter.split(','); // Splits "1,2,3" into ['1', '2', '3']
+            
+            // Checks if the address matches ANY of the numbers in the selected group
+            isValidPresint = presintNumbers.some(num => {
+                const regex = new RegExp(`(?:presint|precinct)\\s*0*${num.trim()}\\b`, 'i');
+                return regex.test(address);
+            });
         }
 
         return isValidTime && isValidPresint;
