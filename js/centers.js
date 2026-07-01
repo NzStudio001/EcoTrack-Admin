@@ -5,7 +5,34 @@ import { collection, doc, setDoc, updateDoc, onSnapshot, query, orderBy, deleteD
 
 let map;
 let markersArray = []; 
-let allCenters = {}; // Cache to store data for the Edit Modal
+let allCenters = {}; 
+
+// ==========================================
+// CUSTOM POPUP FUNCTION (TOAST)
+// ==========================================
+window.showPopupMessage = function(message, type = 'success') {
+    const popup = document.getElementById("customPopup");
+    const msgText = document.getElementById("popupMessage");
+    const icon = document.getElementById("popupIcon");
+
+    msgText.innerText = message;
+    
+    popup.className = "custom-popup"; 
+    
+    if (type === 'error') {
+        popup.classList.add("error");
+        icon.innerText = "⚠️";
+    } else {
+        popup.classList.add("success");
+        icon.innerText = "✅";
+    }
+
+    popup.classList.add("show");
+
+    setTimeout(function() {
+        popup.classList.remove("show");
+    }, 3000);
+}
 
 // ==========================================
 // 1. INITIALIZE LEAFLET MAP
@@ -26,9 +53,8 @@ function loadCenters() {
     onSnapshot(q, (snapshot) => {
         const tableBody = document.getElementById('centersTableBody');
         tableBody.innerHTML = '';
-        allCenters = {}; // Reset cache
+        allCenters = {}; 
 
-        // Clear all existing markers from the map before redrawing
         markersArray.forEach(marker => map.removeLayer(marker));
         markersArray = [];
 
@@ -40,23 +66,21 @@ function loadCenters() {
         snapshot.forEach((docSnap) => {
             const data = docSnap.data();
             const id = docSnap.id;
-            allCenters[id] = data; // Save to cache for editing
+            allCenters[id] = data; 
             
-            // Format the status badge color
             let safeStatus = data.status || "Active";
-            let statusClass = 'completed'; // Green for Active
+            let statusClass = 'completed'; 
             if (safeStatus.toLowerCase() === 'maintenance' || safeStatus.toLowerCase() === 'pending') {
-                statusClass = 'pending'; // Orange for Maintenance
+                statusClass = 'pending'; 
             } else if (safeStatus.toLowerCase() === 'closed') {
-                statusClass = 'rejected'; // Red for Closed
+                statusClass = 'rejected'; 
             }
 
             const row = `
                 <tr>
                     <td style="font-weight: bold;">${data.center_id}</td>
                     <td style="font-weight: 500;">
-                        ${data.name}<br>
-                        <span style="font-size:0.75rem; color: var(--primary);">Lat: ${data.latitude} | Lng: ${data.longitude}</span>
+                        ${data.name}
                     </td>
                     <td>${data.presint}</td>
                     <td><span style="font-size: 0.85rem; color: var(--text-secondary);">${data.address}</span></td>
@@ -68,14 +92,14 @@ function loadCenters() {
                         </span>
                     </td>
                     <td>
-                        <button class="icon-btn" onclick="window.editCenter('${id}')">✏️</button>
-                        <button class="icon-btn danger" onclick="window.deleteCenter('${id}')">🗑️</button>
+                        <button class="icon-btn" title="View Details" onclick="window.viewCenter('${id}')">ℹ️</button>
+                        <button class="icon-btn" title="Edit Center" onclick="window.editCenter('${id}')">✏️</button>
+                        <button class="icon-btn danger" title="Delete Center" onclick="window.deleteCenter('${id}')">🗑️</button>
                     </td>
                 </tr>
             `;
             tableBody.innerHTML += row;
 
-            // Add marker to map
             if (data.latitude && data.longitude) {
                 const marker = L.marker([parseFloat(data.latitude), parseFloat(data.longitude)])
                     .addTo(map)
@@ -91,14 +115,14 @@ loadCenters();
 
 
 // ==========================================
-// 3. ADD NEW CENTER (WITH AUTO-GEOCODING)
+// 3. ADD NEW CENTER
 // ==========================================
 document.getElementById('submitCenterBtn').addEventListener('click', async (e) => {
     e.preventDefault();
 
-    const centerId = document.getElementById('centerId').value.trim();
     const name = document.getElementById('centerName').value.trim();
     const presint = document.getElementById('centerPresint').value;
+    const details = document.getElementById('centerDetails').value.trim();
     const address = document.getElementById('centerAddress').value.trim();
     const contact = document.getElementById('centerContact').value.trim();
     const hours = document.getElementById('centerHours').value.trim();
@@ -106,8 +130,8 @@ document.getElementById('submitCenterBtn').addEventListener('click', async (e) =
     const errorMsg = document.getElementById('centerErrorMsg');
     const submitBtn = document.getElementById('submitCenterBtn');
 
-    if (!centerId || !name || !address) {
-        errorMsg.innerText = "Please fill in all required fields.";
+    if (!name || !address) {
+        errorMsg.innerText = "Please fill in all required fields (Name and Address).";
         errorMsg.style.display = "block";
         return;
     }
@@ -117,7 +141,6 @@ document.getElementById('submitCenterBtn').addEventListener('click', async (e) =
     errorMsg.style.display = "none";
 
     try {
-        // --- CALL OPENSTREETMAP API TO FIND COORDINATES ---
         const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
         const geocodeData = await response.json();
 
@@ -129,14 +152,15 @@ document.getElementById('submitCenterBtn').addEventListener('click', async (e) =
             return;
         }
 
-        // Extract the most relevant Latitude and Longitude
         const lat = parseFloat(geocodeData[0].lat);
         const lng = parseFloat(geocodeData[0].lon);
 
-        // --- SAVE TO FIREBASE ---
-        await setDoc(doc(db, "recycle_centre", centerId), {
-            center_id: centerId,
+        const autoCenterId = "RC" + Math.floor(10000 + Math.random() * 90000); 
+
+        await setDoc(doc(db, "recycle_centre", autoCenterId), {
+            center_id: autoCenterId,
             name: name,
+            details: details,
             presint: presint,
             address: address,
             contact: contact,
@@ -148,6 +172,7 @@ document.getElementById('submitCenterBtn').addEventListener('click', async (e) =
 
         document.getElementById('centerForm').reset();
         window.closeModal('centerModal');
+        showPopupMessage(`Recycling Center added! ID: ${autoCenterId}`, "success");
         
     } catch (error) {
         console.error("Error adding center: ", error);
@@ -161,16 +186,35 @@ document.getElementById('submitCenterBtn').addEventListener('click', async (e) =
 
 
 // ==========================================
-// 4. EDIT CENTER FUNCTION
+// 4. VIEW & EDIT CENTER FUNCTIONS
 // ==========================================
+
+// VIEW DETAILS (UPDATED WITHOUT COORDINATES)
+window.viewCenter = function(id) {
+    const center = allCenters[id];
+    if (!center) return;
+
+    document.getElementById('viewCenterName').innerText = center.name || "Unknown Center";
+    document.getElementById('viewCenterId').innerText = center.center_id || id;
+    document.getElementById('viewCenterPresint').innerText = center.presint || "N/A";
+    document.getElementById('viewCenterContact').innerText = center.contact || "N/A";
+    document.getElementById('viewCenterStatus').innerText = center.status || "Active";
+    document.getElementById('viewCenterHours').innerText = center.operating_hours || "N/A";
+    document.getElementById('viewCenterAddress').innerText = center.address || "N/A";
+    document.getElementById('viewCenterDetails').innerText = center.details || "No details provided.";
+
+    window.openModal('viewCenterModal');
+}
+
+// EDIT DETAILS
 window.editCenter = function(id) {
     const center = allCenters[id];
     if (!center) return;
 
-    // Populate the form fields with existing data
-    document.getElementById('editCenterId').value = id; // Read-Only Document ID
+    document.getElementById('editCenterId').value = id; 
     document.getElementById('editCenterName').value = center.name || "";
-    document.getElementById('editCenterPresint').value = center.presint || "Presint 1, 2, 3";
+    document.getElementById('editCenterDetails').value = center.details || "";
+    document.getElementById('editCenterPresint').value = center.presint || "Presint 1";
     document.getElementById('editCenterAddress').value = center.address || "";
     document.getElementById('editCenterLat').value = center.latitude || "";
     document.getElementById('editCenterLng').value = center.longitude || "";
@@ -181,24 +225,28 @@ window.editCenter = function(id) {
     window.openModal('editCenterModal');
 }
 
-// SAVE EDITS TO FIREBASE
+// SAVE EDITS
 document.getElementById('saveEditCenterBtn').addEventListener('click', async (e) => {
     e.preventDefault();
     
     const id = document.getElementById('editCenterId').value;
     const name = document.getElementById('editCenterName').value.trim();
+    const details = document.getElementById('editCenterDetails').value.trim();
     const presint = document.getElementById('editCenterPresint').value;
     const address = document.getElementById('editCenterAddress').value.trim();
+    
+    // Read hidden coordinates directly
     const lat = document.getElementById('editCenterLat').value;
     const lng = document.getElementById('editCenterLng').value;
+    
     const contact = document.getElementById('editCenterContact').value.trim();
     const hours = document.getElementById('editCenterHours').value.trim();
     const status = document.getElementById('editCenterStatus').value;
 
     const btn = document.getElementById('saveEditCenterBtn');
     
-    if (!name || !address || !lat || !lng) {
-        alert("Please ensure all location and name fields are filled out.");
+    if (!name || !address) {
+        showPopupMessage("Please ensure name and address fields are filled out.", "error");
         return;
     }
 
@@ -208,6 +256,7 @@ document.getElementById('saveEditCenterBtn').addEventListener('click', async (e)
     try {
         await updateDoc(doc(db, "recycle_centre", id), {
             name: name,
+            details: details,
             presint: presint,
             address: address,
             contact: contact,
@@ -218,8 +267,9 @@ document.getElementById('saveEditCenterBtn').addEventListener('click', async (e)
         });
         
         window.closeModal('editCenterModal');
+        showPopupMessage("Center updated successfully!", "success");
     } catch (error) {
-        alert("Error saving updates: " + error.message);
+        showPopupMessage("Error saving updates: " + error.message, "error");
     } finally {
         btn.innerText = "Save Changes";
         btn.disabled = false;
@@ -230,15 +280,33 @@ document.getElementById('saveEditCenterBtn').addEventListener('click', async (e)
 // ==========================================
 // 5. DELETE CENTER FUNCTION
 // ==========================================
-window.deleteCenter = async function(id) {
-    if (confirm(`Are you sure you want to permanently delete Center ID: ${id}?`)) {
-        try {
-            await deleteDoc(doc(db, "recycle_centre", id));
-        } catch (error) {
-            alert("Error deleting: " + error.message);
-        }
-    }
+let centerToDeleteId = null;
+
+window.deleteCenter = function(id) {
+    centerToDeleteId = id;
+    window.openModal('deleteConfirmModal');
 }
+
+document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+    if (!centerToDeleteId) return;
+
+    const btn = document.getElementById('confirmDeleteBtn');
+    const originalText = btn.innerText;
+    btn.innerText = "Deleting...";
+    btn.disabled = true;
+
+    try {
+        await deleteDoc(doc(db, "recycle_centre", centerToDeleteId));
+        window.closeModal('deleteConfirmModal');
+        showPopupMessage("Center successfully deleted!", "success");
+    } catch (error) {
+        showPopupMessage("Error deleting: " + error.message, "error");
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+        centerToDeleteId = null;
+    }
+});
 
 
 // ==========================================

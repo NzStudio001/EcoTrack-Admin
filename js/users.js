@@ -6,6 +6,35 @@ import { getAuth, createUserWithEmailAndPassword, signOut, onAuthStateChanged } 
 import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
 
 // ==========================================
+// CUSTOM POPUP FUNCTION (TOAST)
+// ==========================================
+window.showPopupMessage = function(message, type = 'success') {
+    const popup = document.getElementById("customPopup");
+    const msgText = document.getElementById("popupMessage");
+    const icon = document.getElementById("popupIcon");
+
+    msgText.innerText = message;
+    
+    // Reset classes
+    popup.className = "custom-popup"; 
+    
+    if (type === 'error') {
+        popup.classList.add("error");
+        icon.innerText = "⚠️";
+    } else {
+        popup.classList.add("success");
+        icon.innerText = "✅";
+    }
+
+    popup.classList.add("show");
+
+    // Hide after 3 seconds
+    setTimeout(function() {
+        popup.classList.remove("show");
+    }, 3000);
+}
+
+// ==========================================
 // 1. TAB SWITCHING LOGIC
 // ==========================================
 window.showUserTab = function(type) {
@@ -210,7 +239,7 @@ document.getElementById('submitWmoBtn').addEventListener('click', async (e) => {
 
         document.getElementById('wmoForm').reset();
         window.closeModal('userModal');
-        alert("WMO Account created successfully!");
+        showPopupMessage("WMO Account created successfully!", "success");
 
     } catch (error) {
         console.error("Error creating WMO:", error);
@@ -227,16 +256,35 @@ document.getElementById('submitWmoBtn').addEventListener('click', async (e) => {
 // 4. EDIT & DELETE USER FUNCTIONS
 // ==========================================
 
-// DELETE
-window.deleteUser = async function(id) {
-    if (confirm("Are you sure you want to permanently delete this user from the database?")) {
-        try {
-            await deleteDoc(doc(db, "users", id));
-        } catch (error) {
-            alert("Error deleting user: " + error.message);
-        }
-    }
+let userToDeleteId = null;
+
+// TRIGGER DELETE MODAL
+window.deleteUser = function(id) {
+    userToDeleteId = id; 
+    window.openModal('deleteConfirmModal'); 
 }
+
+// EXECUTE DELETION
+document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+    if (!userToDeleteId) return;
+
+    const btn = document.getElementById('confirmDeleteBtn');
+    const originalText = btn.innerText;
+    btn.innerText = "Deleting...";
+    btn.disabled = true;
+
+    try {
+        await deleteDoc(doc(db, "users", userToDeleteId));
+        window.closeModal('deleteConfirmModal');
+        showPopupMessage("User successfully deleted!", "success");
+    } catch (error) {
+        showPopupMessage("Error deleting user: " + error.message, "error");
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+        userToDeleteId = null; 
+    }
+});
 
 // OPEN EDIT MODAL
 window.editUser = function(id) {
@@ -267,12 +315,11 @@ window.editUser = function(id) {
 // SAVE EDITS TO FIREBASE
 document.getElementById('saveEditUserBtn').addEventListener('click', async () => {
     const userId = document.getElementById('editUserId').value;
-    const newName = document.getElementById('editUserName').value.trim();
     const newEmail = document.getElementById('editUserEmail').value.trim();
     const btn = document.getElementById('saveEditUserBtn');
 
-    if (!userId || !newName || !newEmail) {
-        alert("Name and Email are required fields.");
+    if (!userId || !newEmail) {
+        showPopupMessage("Email is a required field.", "error");
         return;
     }
 
@@ -281,7 +328,6 @@ document.getElementById('saveEditUserBtn').addEventListener('click', async () =>
 
     try {
         const updateData = { 
-            name: newName,
             email: newEmail
         };
 
@@ -292,9 +338,10 @@ document.getElementById('saveEditUserBtn').addEventListener('click', async () =>
 
         await updateDoc(doc(db, "users", userId), updateData);
         window.closeModal('editUserModal');
+        showPopupMessage("User updated successfully!", "success");
 
     } catch (error) {
-        alert("Error saving updates: " + error.message);
+        showPopupMessage("Error saving updates: " + error.message, "error");
     } finally {
         btn.innerText = "Save Changes";
         btn.disabled = false;

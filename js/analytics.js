@@ -7,11 +7,13 @@ import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.10
 let reportsChartInstance = null;
 let statusChartInstance = null;
 let mapInstance = null;
-let markersArray = [];
 
-let allRawReports = []; // Stores all data from Firebase
-let rawExportData = []; // Stores filtered raw data for Excel/CSV Export
-let rawExportWmoStats = {}; // NEW: Stores the WMO summary stats for Excel/CSV Export
+// NEW: Stores the heatmap layer so we can clear it on filter change
+let heatLayerInstance = null;
+
+let allRawReports = []; 
+let rawExportData = []; 
+let rawExportWmoStats = {}; 
 
 // ==========================================
 // 1. EXPORT FUNCTIONS
@@ -47,7 +49,6 @@ window.generateExcel = function() {
 
     let csvContent = "data:text/csv;charset=utf-8,";
     
-    // --- NEW: SECTION 1 - WMO SUMMARY ---
     csvContent += "--- WMO PERFORMANCE SUMMARY ---\n";
     csvContent += "WMO Name,Pending,In Progress,Completed,Total Assigned Reports\n";
     
@@ -55,9 +56,8 @@ window.generateExcel = function() {
         csvContent += `"${wmoName}",${stats.pending},${stats.inProgress},${stats.completed},${stats.total}\n`;
     }
 
-    csvContent += "\n\n"; // Add space between tables
+    csvContent += "\n\n"; 
 
-    // --- SECTION 2 - RAW REPORT DATA ---
     csvContent += "--- DETAILED REPORT DATA ---\n";
     csvContent += "Report ID,Waste Type,Assigned WMO,Status\n";
 
@@ -89,7 +89,6 @@ onAuthStateChanged(auth, (user) => {
 // 3. FETCH DATA & ATTACH LISTENERS
 // ==========================================
 function fetchFirebaseData() {
-    // Listen to Firebase Updates
     onSnapshot(collection(db, 'reports'), (snapshot) => {
         allRawReports = [];
         snapshot.forEach(doc => {
@@ -99,7 +98,6 @@ function fetchFirebaseData() {
         applyFiltersAndUpdateUI();
     });
 
-    // Attach listeners to Dropdowns
     document.getElementById('timeFilter').addEventListener('change', applyFiltersAndUpdateUI);
     document.getElementById('presintFilter').addEventListener('change', applyFiltersAndUpdateUI);
 }
@@ -114,7 +112,6 @@ function applyFiltersAndUpdateUI() {
 
     // -- A. Filter Data Array --
     const filteredReports = allRawReports.filter(report => {
-        // 1. Time Check
         let isValidTime = true;
         if (timeFilter !== 'all' && report.timestamp) {
             const reportDate = report.timestamp.toDate ? report.timestamp.toDate() : new Date(report.timestamp);
@@ -128,13 +125,11 @@ function applyFiltersAndUpdateUI() {
             if (timeFilter === '1year' && diffDays > 365) isValidTime = false;
         }
 
-        // 2. Presint Check (Updated to handle grouped values like "1,2,3")
         let isValidPresint = true;
         if (presintFilter !== 'all') {
             const address = (report.address || '').toLowerCase();
-            const presintNumbers = presintFilter.split(','); // Splits "1,2,3" into ['1', '2', '3']
+            const presintNumbers = presintFilter.split(','); 
             
-            // Checks if the address matches ANY of the numbers in the selected group
             isValidPresint = presintNumbers.some(num => {
                 const regex = new RegExp(`(?:presint|precinct)\\s*0*${num.trim()}\\b`, 'i');
                 return regex.test(address);
@@ -149,10 +144,12 @@ function applyFiltersAndUpdateUI() {
     let completedCount = 0;
     let statusCounts = { pending: 0, inProgress: 0, resolved: 0, rejected: 0 };
     let dateCounts = {}; 
-    let mapPoints = [];
     
-    rawExportData = []; // Clear old export data
-    rawExportWmoStats = {}; // NEW: Clear old WMO stats
+    // NEW: Array to hold heatmap coordinate data
+    let heatData = [];
+    
+    rawExportData = []; 
+    rawExportWmoStats = {}; 
 
     filteredReports.forEach(report => {
         
@@ -177,7 +174,6 @@ function applyFiltersAndUpdateUI() {
 
         let wmoName = report.assigned_wmo_name || 'Unassigned';
 
-        // --- NEW: Calculate WMO Stats for Export ---
         if (!rawExportWmoStats[wmoName]) {
             rawExportWmoStats[wmoName] = { pending: 0, inProgress: 0, completed: 0, total: 0 };
         }
@@ -186,8 +182,6 @@ function applyFiltersAndUpdateUI() {
         if (displayStatus === 'In Progress') rawExportWmoStats[wmoName].inProgress++;
         if (displayStatus === 'Resolved') rawExportWmoStats[wmoName].completed++;
 
-
-        // Format Date for charts
         if (report.timestamp) {
             const d = report.timestamp.toDate ? report.timestamp.toDate() : new Date(report.timestamp);
             const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -203,14 +197,11 @@ function applyFiltersAndUpdateUI() {
             lng: report.longitude || 'N/A'
         });
 
-        // Map Prep
+        // Heatmap Prep: Extract [lat, lng, intensity]
         if (report.latitude && report.longitude) {
-            mapPoints.push({
-                lat: parseFloat(report.latitude),
-                lng: parseFloat(report.longitude),
-                title: report.type || "Waste Report",
-                status: displayStatus
-            });
+            // Give pending/active reports a higher heat intensity (1.0) vs resolved ones (0.5)
+            let intensity = (displayStatus === 'Resolved') ? 0.5 : 1.0;
+            heatData.push([parseFloat(report.latitude), parseFloat(report.longitude), intensity]);
         }
     });
 
@@ -226,7 +217,7 @@ function applyFiltersAndUpdateUI() {
     // -- D. Update Charts & Maps --
     updateStatusChart(statusCounts);
     updateReportsChart(dateCounts);
-    updateMapMarkers(mapPoints);
+    updateMapHeatmap(heatData); // Call the new heatmap function
 }
 
 
@@ -296,17 +287,27 @@ function initMap() {
     }).addTo(mapInstance);
 }
 
-function updateMapMarkers(mapPoints) {
+// NEW FUNCTION: UPDATE MAP HEATMAP
+function updateMapHeatmap(heatData) {
     if (!mapInstance) return;
 
-    markersArray.forEach(marker => mapInstance.removeLayer(marker));
-    markersArray = [];
+    // 1. Remove the old heat layer if it exists
+    if (heatLayerInstance) {
+        mapInstance.removeLayer(heatLayerInstance);
+    }
 
-    mapPoints.forEach(point => {
-        const marker = L.marker([point.lat, point.lng])
-            .addTo(mapInstance)
-            .bindPopup(`<b>${point.title}</b><br>Status: ${point.status}`);
-        
-        markersArray.push(marker);
-    });
+    // 2. Configure and add the new heat layer
+    // Adjust 'radius' and 'blur' below to make the heatmap spots larger/smaller
+    heatLayerInstance = L.heatLayer(heatData, {
+        radius: 25,
+        blur: 15,
+        maxZoom: 12,
+        gradient: {
+            0.4: 'blue', 
+            0.6: 'cyan', 
+            0.7: 'lime', 
+            0.8: 'yellow', 
+            1.0: 'red'
+        }
+    }).addTo(mapInstance);
 }

@@ -1,11 +1,38 @@
 // js/reports.js
 
 import { db } from './firebase-init.js';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
 
 let allReports = {}; 
 let wmoList = []; 
 let currentEditingReportId = null;
+
+// ==========================================
+// CUSTOM POPUP FUNCTION (TOAST)
+// ==========================================
+window.showPopupMessage = function(message, type = 'success') {
+    const popup = document.getElementById("customPopup");
+    const msgText = document.getElementById("popupMessage");
+    const icon = document.getElementById("popupIcon");
+
+    msgText.innerText = message;
+    
+    popup.className = "custom-popup"; 
+    
+    if (type === 'error') {
+        popup.classList.add("error");
+        icon.innerText = "⚠️";
+    } else {
+        popup.classList.add("success");
+        icon.innerText = "✅";
+    }
+
+    popup.classList.add("show");
+
+    setTimeout(function() {
+        popup.classList.remove("show");
+    }, 3000);
+}
 
 // ==========================================
 // 1. FETCH WMO OFFICERS FOR DROPDOWN
@@ -29,16 +56,17 @@ function loadWMOs() {
 }
 
 // ==========================================
-// 2. FETCH REPORTS
+// 2. FETCH REPORTS & CALCULATE OVERDUE
 // ==========================================
 function loadReports() {
-    onSnapshot(collection(db, 'reports'), (snapshot) => {
+    const reportsQuery = query(collection(db, 'reports'), orderBy('timestamp', 'desc'));
+
+    onSnapshot(reportsQuery, (snapshot) => {
         const tableBody = document.getElementById('reportsTableBody');
         tableBody.innerHTML = '';
         allReports = {}; 
 
         if (snapshot.empty) {
-            // Updated to colspan="8"
             tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No reports found.</td></tr>';
             return;
         }
@@ -54,16 +82,12 @@ function loadReports() {
             const address = data.address ? data.address.substring(0, 30) + '...' : 'Coordinates provided';
             const wmoName = data.assigned_wmo_name || '<span style="color: var(--warning);">Unassigned</span>';
             
-            // Format dates for display AND filtering
             let displayDate = 'N/A';
-            let isoDate = ''; // This will hold the "YYYY-MM-DD" format for the filter matching
+            let isoDate = ''; 
             
             if (data.timestamp) {
                 const dateObj = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
-                // Human readable display date
                 displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                
-                // Adjust for local timezone to match HTML date picker
                 const offset = dateObj.getTimezoneOffset() * 60000;
                 const localISOTime = (new Date(dateObj - offset)).toISOString().slice(0, -1);
                 isoDate = localISOTime.split('T')[0];
@@ -78,7 +102,26 @@ function loadReports() {
             if (statusText.toLowerCase() === 'in progress') statusClass = 'in-progress';
             if (statusText.toLowerCase() === 'rejected') statusClass = 'rejected';
 
-            // Include data-date attribute directly in the row tag
+            // --- OVERDUE CALCULATION LOGIC ---
+            let isOverdue = false;
+            let daysOld = 0;
+            let overdueBadge = '';
+
+            if (data.timestamp) {
+                const reportDate = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+                const today = new Date();
+                const diffTime = Math.abs(today - reportDate);
+                daysOld = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
+
+                if (daysOld >= 3 && statusText !== 'Resolved' && statusText !== 'Rejected') {
+                    isOverdue = true;
+                    overdueBadge = `
+                        <span style="background-color: #fee2e2; color: #dc2626; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-top: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                            ⚠️ ${daysOld} Days Overdue
+                        </span>`;
+                }
+            }
+
             const row = `
                 <tr data-date="${isoDate}">
                     <td style="font-weight: bold; color: var(--text-secondary);" title="${data.report_id || id}">${shortId}</td>
@@ -87,10 +130,13 @@ function loadReports() {
                     <td>${address}</td>
                     <td style="font-weight: 500;">${wmoName}</td>
                     <td>
-                        <span class="status-badge ${statusClass}">
-                            <span class="status-dot"></span>
-                            ${statusText}
-                        </span>
+                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                            <span class="status-badge ${statusClass}">
+                                <span class="status-dot"></span>
+                                ${statusText}
+                            </span>
+                            ${overdueBadge}
+                        </div>
                     </td>
                     <td><span style="font-size: 0.85rem; color: var(--text-secondary);">${displayDate}</span></td>
                     <td>
@@ -101,7 +147,6 @@ function loadReports() {
             tableBody.innerHTML += row;
         });
         
-        // Re-apply filter automatically whenever data refreshes
         filterTable();
     });
 }
@@ -119,7 +164,6 @@ window.openReportModal = function(id) {
 
     currentEditingReportId = id;
 
-    // Populate Read-Only Fields
     document.getElementById('modalReportId').value = data.report_id || id;
     document.getElementById('modalType').value = data.type || 'N/A';
     document.getElementById('modalCondition').value = data.condition || 'N/A';
@@ -141,7 +185,6 @@ window.openReportModal = function(id) {
     }
     document.getElementById('modalTime').value = timeString;
 
-    // Populate Image
     const imgEl = document.getElementById('modalImage');
     const noImgEl = document.getElementById('modalNoImage');
     let imageUrl = data.image_url;
@@ -157,7 +200,6 @@ window.openReportModal = function(id) {
         noImgEl.style.display = 'block';
     }
 
-    // Set Editable Dropdowns
     const safePrediction = data.ai_prediction || 'Unanalyzed';
     const predictionSelect = document.getElementById('modalPrediction');
     let optionExists = Array.from(predictionSelect.options).some(opt => opt.value === safePrediction);
@@ -176,7 +218,7 @@ window.openReportModal = function(id) {
 document.getElementById('autoAssignBtn').addEventListener('click', () => {
     if (!currentEditingReportId) return;
     if (wmoList.length === 0) {
-        alert("There are no WMO officers available in the system!");
+        showPopupMessage("There are no WMO officers available in the system!", "error");
         return;
     }
 
@@ -191,7 +233,7 @@ document.getElementById('autoAssignBtn').addEventListener('click', () => {
     }
 
     if (!detectedPresintNum) {
-        alert("Could not detect a specific Presint in the report's address to auto-assign.");
+        showPopupMessage("Could not detect a specific Presint in the report's address to auto-assign.", "error");
         return;
     }
 
@@ -202,7 +244,7 @@ document.getElementById('autoAssignBtn').addEventListener('click', () => {
     });
 
     if (matchingWMOs.length === 0) {
-        alert(`No WMO officer found covering Presint ${detectedPresintNum}.`);
+        showPopupMessage(`No WMO officer found covering Presint ${detectedPresintNum}.`, "error");
         return;
     }
 
@@ -213,7 +255,7 @@ document.getElementById('autoAssignBtn').addEventListener('click', () => {
     const selectedWMO = sortedWMOs[0]; 
     document.getElementById('modalWmoSelect').value = selectedWMO.id;
     
-    alert(`Smart Assign: Selected ${selectedWMO.name} because they cover Presint ${detectedPresintNum}.`);
+    showPopupMessage(`Smart Assign: Selected ${selectedWMO.name} because they cover Presint ${detectedPresintNum}.`, "success");
 });
 
 
@@ -247,10 +289,11 @@ document.getElementById('updateReportBtn').addEventListener('click', async () =>
         });
 
         window.closeModal('reportModal');
+        showPopupMessage("Report updated successfully!", "success");
         
     } catch (error) {
         console.error("Error updating report:", error);
-        alert("Failed to update: " + error.message);
+        showPopupMessage("Failed to update: " + error.message, "error");
     } finally {
         btn.innerText = originalText;
         btn.disabled = false;
@@ -263,29 +306,37 @@ document.getElementById('updateReportBtn').addEventListener('click', async () =>
 // ==========================================
 const deleteReportBtn = document.getElementById('deleteReportBtn');
 if (deleteReportBtn) {
-    deleteReportBtn.addEventListener('click', async () => {
+    // 1. Open custom modal when delete is clicked
+    deleteReportBtn.addEventListener('click', () => {
         if (!currentEditingReportId) return;
-
-        const confirmDelete = window.confirm("Are you sure you want to delete this waste report? This action cannot be undone.");
-        
-        if (confirmDelete) {
-            const originalText = deleteReportBtn.innerText;
-            deleteReportBtn.innerText = "Deleting...";
-            deleteReportBtn.disabled = true;
-
-            try {
-                await deleteDoc(doc(db, 'reports', currentEditingReportId));
-                window.closeModal('reportModal');
-            } catch (error) {
-                console.error("Error deleting report:", error);
-                alert("Failed to delete: " + error.message);
-            } finally {
-                deleteReportBtn.innerText = originalText;
-                deleteReportBtn.disabled = false;
-            }
-        }
+        window.openModal('deleteConfirmModal');
     });
 }
+
+// 2. Handle actual deletion when "Delete" is clicked on the custom modal
+document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+    if (!currentEditingReportId) return;
+
+    const btn = document.getElementById('confirmDeleteBtn');
+    const originalText = btn.innerText;
+    btn.innerText = "Deleting...";
+    btn.disabled = true;
+
+    try {
+        await deleteDoc(doc(db, 'reports', currentEditingReportId));
+        
+        window.closeModal('deleteConfirmModal');
+        window.closeModal('reportModal');
+        
+        showPopupMessage("Report successfully deleted!", "success");
+    } catch (error) {
+        console.error("Error deleting report:", error);
+        showPopupMessage("Failed to delete: " + error.message, "error");
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
+});
 
 
 // ==========================================
@@ -294,7 +345,7 @@ if (deleteReportBtn) {
 function filterTable() {
     let searchValue = document.getElementById("reportSearch").value.toLowerCase();
     let statusFilter = document.getElementById("statusFilter").value.toLowerCase();
-    let dateFilter = document.getElementById("dateFilter").value; // Format: "YYYY-MM-DD"
+    let dateFilter = document.getElementById("dateFilter").value; 
     let rows = document.querySelectorAll("#reportsTableBody tr");
 
     rows.forEach(row => {
@@ -302,9 +353,14 @@ function filterTable() {
         
         let rowText = row.textContent.toLowerCase();
         let matchesSearch = rowText.includes(searchValue);
-        let matchesStatus = statusFilter === "" || rowText.includes(statusFilter);
         
-        // Date Logic Check
+        let matchesStatus = false;
+        if (statusFilter === 'overdue') {
+            matchesStatus = rowText.includes('overdue');
+        } else {
+            matchesStatus = statusFilter === "" || rowText.includes(statusFilter);
+        }
+        
         let rowDate = row.getAttribute("data-date") || "";
         let matchesDate = dateFilter === "" || rowDate === dateFilter;
 
@@ -312,7 +368,6 @@ function filterTable() {
     });
 }
 
-// Attach all event listeners
 document.getElementById("reportSearch").addEventListener("keyup", filterTable);
 document.getElementById("statusFilter").addEventListener("change", filterTable);
 document.getElementById("dateFilter").addEventListener("change", filterTable);
